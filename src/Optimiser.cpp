@@ -476,8 +476,14 @@ double Optimiser::move_nodes(MutableVertexPartition* partition, int consider_com
         // Check if we should move to an empty community
         if (this->consider_empty_community)
         {
+          // If we are debugging, calculate quality function
+          double wtc = partition->weight_to_comm(v, v_comm);
+          double wfc = partition->weight_from_comm(v, v_comm);
+          double w = wtc + wfc;
+          size_t csize_old = partition->csize(v_comm);
           neigh_comm = partition->nb_communities();
           possible_improv = partition->diff_move(v, neigh_comm);
+          cerr << "Node " << v << " to empty community from community of size " << csize_old << ".\tdelta=" << possible_improv << "\tw_old=" << w << endl;
           if (possible_improv > max_improv)
           {
             max_improv = possible_improv;
