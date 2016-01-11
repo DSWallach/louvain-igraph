@@ -127,6 +127,8 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
       #ifdef DEBUG
         cerr << "\tStarting SLM with " << sub_collapsed_partition->nb_communities() << " communities." << endl;
       #endif
+
+      // We should repeat the smart local move until the sub_collapsed_partition is stable.
       if (this->aggregate_smart_local_move)
         this->optimise_partition_constrained(sub_collapsed_partition, collapsed_partition->membership());
       else
@@ -769,8 +771,10 @@ double Optimiser::move_nodes_constrained(MutableVertexPartition* partition, vect
 
     // For each node
     for(vector<size_t>::iterator it_vertex = vertex_order.begin();
-        it_vertex != vertex_order.end(); ++it_vertex) {
+        it_vertex != vertex_order.end(); ++it_vertex)
+    {
       size_t v = *it_vertex; // The actual vertex we will now consider
+
       // Only take into account nodes of degree higher than zero
       if (graph->degree(v, IGRAPH_ALL) > 0)
       {
