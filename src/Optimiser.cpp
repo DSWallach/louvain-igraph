@@ -150,6 +150,11 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
       // While we keep splitting (sub)communities
       while (new_sub_collapsed_partition->nb_communities() > sub_collapsed_partition->nb_communities());
 
+      if (sub_collapsed_partition != NULL)
+        delete sub_collapsed_partition;
+
+      sub_collapsed_partition = new_sub_collapsed_partition;
+
       #ifdef DEBUG
         cerr << "\tAfter applying SLM found " << sub_collapsed_partition->nb_communities() << " communities." << endl;
       #endif
@@ -184,6 +189,7 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
           //cerr << sub_collapsed_partition->membership(v) << "\t" << sub_collapsed_partition->membership(v) << endl;
         #endif // DEBUG
       }
+      delete sub_collapsed_partition;
 
       // Create collapsed partition. The
       new_collapsed_partition = collapsed_partition->create(new_collapsed_graph, new_collapsed_membership);

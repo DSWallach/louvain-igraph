@@ -116,6 +116,7 @@ void MutableVertexPartition::init_admin()
   this->community.clear();
   for (size_t i = 0; i < nb_comms; i++)
     this->community.push_back(new set<size_t>());
+
   this->_total_weight_in_comm.clear();
   this->_total_weight_in_comm.resize(nb_comms);
   this->_total_weight_from_comm.clear();
