@@ -173,7 +173,7 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
       // even though the aggregation may be slightly different, the
       // membership of the aggregated nodes is as indicated by the original partition.)
       #ifdef DEBUG
-        cerr << "SLM\tOrig" << endl;
+        //cerr << "SLM\tOrig" << endl;
       #endif // DEBUG
       for (size_t v = 0; v < collapsed_graph->vcount(); v++)
       {
@@ -249,10 +249,12 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
       }
       cerr <<   "partition->quality()=" << q
            << ", collapsed_partition->quality()=" << q_collapsed << endl;
-      cerr <<   "graph->total_weight()=" << graph->total_weight()
-           << ", collapsed_graph->total_weight()=" << collapsed_graph->total_weight() << endl;
+      cerr <<   "graph->vcount()=" << graph->vcount()
+           << ", collapsed_graph->vcount()="  << collapsed_graph->vcount() << endl;
       cerr <<   "graph->ecount()=" << graph->ecount()
            << ", collapsed_graph->ecount()="  << collapsed_graph->ecount() << endl;
+      cerr <<   "graph->total_weight()=" << graph->total_weight()
+           << ", collapsed_graph->total_weight()=" << collapsed_graph->total_weight() << endl;
       cerr <<   "graph->is_directed()=" << graph->is_directed()
            << ", collapsed_graph->is_directed()="  << collapsed_graph->is_directed() << endl;
       cerr <<   "graph->correct_self_loops()=" << graph->correct_self_loops()
