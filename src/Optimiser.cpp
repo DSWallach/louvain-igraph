@@ -126,10 +126,6 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
       MutableVertexPartition* new_sub_collapsed_partition = collapsed_partition->create(collapsed_graph, collapsed_partition->membership());
 
       // Then move around nodes but restrict movement to within original communities.
-      #ifdef DEBUG
-        size_t round = 0;
-        cerr << "\tStarting SLM with " << collapsed_graph->vcount()<< " communities." << endl;
-      #endif
       do
       {
         if (sub_collapsed_partition != NULL)
@@ -137,7 +133,12 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
 
         sub_collapsed_partition = new_sub_collapsed_partition;
 
-        new_collapsed_partition = sub_collapsed_partition->create(collapsed_graph);
+        new_sub_collapsed_partition = sub_collapsed_partition->create(collapsed_graph);
+        #ifdef DEBUG
+          size_t round = 0;
+          cerr << "\tStarting from " << new_sub_collapsed_partition->nb_communities() << " communities within "
+               << sub_collapsed_partition->nb_communities() << " constrained communities. "<< endl;
+        #endif
         if (this->aggregate_smart_local_move)
           this->optimise_partition_constrained(new_sub_collapsed_partition, sub_collapsed_partition->membership());
         else
@@ -147,7 +148,7 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
         #endif
       }
       // While we keep splitting (sub)communities
-      while (new_sub_collapsed_partition->nb_communities() < sub_collapsed_partition->nb_communities());
+      while (new_sub_collapsed_partition->nb_communities() > sub_collapsed_partition->nb_communities());
 
       #ifdef DEBUG
         cerr << "\tAfter applying SLM found " << sub_collapsed_partition->nb_communities() << " communities." << endl;
