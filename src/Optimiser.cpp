@@ -121,18 +121,34 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
       #ifdef DEBUG
         cerr << "\tBefore SLM " << collapsed_partition->nb_communities() << " communities." << endl;
       #endif
-      sub_collapsed_partition = collapsed_partition->create(collapsed_graph);
+
+      // We should repeat the smart local move until the sub_collapsed_partition is stable.
+      MutableVertexPartition* new_sub_collapsed_partition = collapsed_partition->create(collapsed_graph, collapsed_partition->membership());
 
       // Then move around nodes but restrict movement to within original communities.
       #ifdef DEBUG
-        cerr << "\tStarting SLM with " << sub_collapsed_partition->nb_communities() << " communities." << endl;
+        size_t round = 0;
+        cerr << "\tStarting SLM with " << new_sub_collapsed_partition->nb_communities() << " communities." << endl;
       #endif
+      do
+      {
+        if (sub_collapsed_partition != NULL)
+          delete sub_collapsed_partition;
 
-      // We should repeat the smart local move until the sub_collapsed_partition is stable.
-      if (this->aggregate_smart_local_move)
-        this->optimise_partition_constrained(sub_collapsed_partition, collapsed_partition->membership());
-      else
-        this->move_nodes_constrained(sub_collapsed_partition, collapsed_partition->membership());
+        sub_collapsed_partition = new_sub_collapsed_partition;
+
+        new_collapsed_partition = sub_collapsed_partition->create(collapsed_graph);
+        if (this->aggregate_smart_local_move)
+          this->optimise_partition_constrained(new_sub_collapsed_partition, sub_collapsed_partition->membership());
+        else
+          this->move_nodes_constrained(new_sub_collapsed_partition, sub_collapsed_partition->membership());
+        #ifdef DEBUG
+          cerr << "\tAfter " << ++round << " rounds of recursive SLM found " << new_sub_collapsed_partition->nb_communities() << " communities." << endl;
+        #endif
+      }
+      // While we keep splitting (sub)communities
+      while (new_sub_collapsed_partition->nb_communities() < sub_collapsed_partition->nb_communities());
+
       #ifdef DEBUG
         cerr << "\tAfter applying SLM found " << sub_collapsed_partition->nb_communities() << " communities." << endl;
       #endif
@@ -164,7 +180,7 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
         size_t new_aggregate_node = sub_collapsed_partition->membership(v);
         new_collapsed_membership[new_aggregate_node] = collapsed_partition->membership(v);
         #ifdef DEBUG
-          cerr << sub_collapsed_partition->membership(v) << "\t" << sub_collapsed_partition->membership(v) << endl;
+          //cerr << sub_collapsed_partition->membership(v) << "\t" << sub_collapsed_partition->membership(v) << endl;
         #endif // DEBUG
       }
 
