@@ -128,7 +128,7 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
       // Then move around nodes but restrict movement to within original communities.
       #ifdef DEBUG
         size_t round = 0;
-        cerr << "\tStarting SLM with " << new_sub_collapsed_partition->nb_communities() << " communities." << endl;
+        cerr << "\tStarting SLM with " << collapsed_graph->vcount()<< " communities." << endl;
       #endif
       do
       {
