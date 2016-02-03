@@ -123,41 +123,27 @@ double Optimiser::optimise_partition(MutableVertexPartition* partition)
       #endif
 
       // We should repeat the smart local move until the sub_collapsed_partition is stable.
-      MutableVertexPartition* new_sub_collapsed_partition = collapsed_partition->create(collapsed_graph, collapsed_partition->membership());
+      sub_collapsed_partition = collapsed_partition->create(collapsed_graph, collapsed_partition->membership());
 
-      // Then move around nodes but restrict movement to within original communities.
-      do
+      // We start from the detected partition, and check for each community whether we can find subcommunities
+
+      // Make sure to first determine the number of communities, otherwise, this may be incorrect
+      // since we repeatedly add empty communities, so that the number of communities keep rising
+      // during the recursion. Note though that we do not touch the rest of the communities
+      // during the recursion, so that we can safely use the remaining communities as they are.
+      size_t nb_comms = sub_collapsed_partition->nb_communities();
+      for (size_t comm = 0; comm < ; comm++)
       {
-        if (sub_collapsed_partition != NULL)
-          delete sub_collapsed_partition;
-
-        sub_collapsed_partition = new_sub_collapsed_partition;
-
-        new_sub_collapsed_partition = sub_collapsed_partition->create(collapsed_graph);
-        #ifdef DEBUG
-          size_t round = 0;
-          cerr << "\tStarting from " << new_sub_collapsed_partition->nb_communities() << " communities within "
-               << sub_collapsed_partition->nb_communities() << " constrained communities. "<< endl;
-        #endif
-        if (this->aggregate_smart_local_move)
-          this->optimise_partition_constrained(new_sub_collapsed_partition, sub_collapsed_partition->membership());
-        else
-          this->move_nodes_constrained(new_sub_collapsed_partition, sub_collapsed_partition->membership());
-        #ifdef DEBUG
-          cerr << "\tAfter " << ++round << " rounds of recursive SLM found " << new_sub_collapsed_partition->nb_communities() << " communities." << endl;
-        #endif
+        // Whether we recursively find more refined subsets.
+        set<size_t> node_subset = partition->get_community(comm);
+        this->move_nodes_subset_recursive(partition, node_subset);
       }
-      // While we keep splitting (sub)communities
-      while (new_sub_collapsed_partition->nb_communities() > sub_collapsed_partition->nb_communities());
-
-      if (sub_collapsed_partition != NULL)
-        delete sub_collapsed_partition;
-
-      sub_collapsed_partition = new_sub_collapsed_partition;
 
       #ifdef DEBUG
         cerr << "\tAfter applying SLM found " << sub_collapsed_partition->nb_communities() << " communities." << endl;
       #endif
+
+      // At this point, sub_collapsed_partition should contain the refined partition.
 
       // Determine new aggregate node per individual node
       for (size_t v = 0; v < graph->vcount(); v++)
@@ -627,127 +613,34 @@ double Optimiser::move_nodes(MutableVertexPartition* partition, int consider_com
   return total_improv;
 }
 
-/*****************************************************************************
-  optimise the provided partition.
-*****************************************************************************/
-double Optimiser::optimise_partition_constrained(MutableVertexPartition* partition, vector<size_t> const & constrained_membership)
+double Optimiser::move_nodes_subset_recursive(MutableVertexPartition* partition, set<size_t> const& node_subset)
 {
-  #ifdef DEBUG
-    cerr << "void Optimiser::optimise_partition_constrained(MutableVertexPartition* partition, vector<size_t> const & constrained_membership)" << endl;
-  #endif
-
-  #ifdef DEBUG
-    cerr << "Using partition at address " << partition << endl;
-  #endif
-
-  // Get the graph from the partition
-  Graph* graph = partition->get_graph();
-
-  #ifdef DEBUG
-    cerr << "Using graph at address " << graph << endl;
-  #endif
-
-  // Declare the collapsed_graph variable which will contain the graph
-  // collapsed by its communities. We will use this variables at each
-  // further iteration, so we don't keep a collapsed graph at each pass.
-  Graph* collapsed_graph = NULL;
-  MutableVertexPartition* collapsed_partition = NULL;
-
-  // Do one iteration of optimisation
-  double improv = 2*this->eps;
-  // As long as there remains improvement iterate
-  while (improv > this->eps)
+  // First break this subset in pieces
+  partition->break_node_set(node_subset);
+  // and then see if we can stitch it back together
+  this->move_nodes_subset(partition, node_subset);
+  set<size_t>* comms = partition->get_communities_node_set(node_subset);
+  // If we find multiple communities
+  if (comm.size() > 1)
   {
-    // First collapse graph (i.e. community graph
-
-    improv = 0.0;
-    // Try to move individual nodes again
-    // We need to move individual nodes before doing slm, because
-    // otherwise, moving individual nodes may possibly disconnected
-    // graphs again, which then needs to be corrected for by resorting to slm
-    if (this->move_individual)
-      improv += this->move_nodes_constrained(partition, constrained_membership);
-
-    collapsed_graph = graph->collapse_graph(partition);
-
-    // Create collapsed partition (i.e. default partition of each node in its own community).
-    collapsed_partition = partition->create(collapsed_graph);
-
-    // Determine the membership for the collapsed graph
-    vector< size_t > collapsed_constrained_membership(collapsed_graph->vcount());
-
-    // If we collapse the graph, every node of the collapsed graph
-    // should still adhere to the same constrained membership.
-    // That is, if we collapse community c, then the constrained membership
-    // of that community c would be the same for every node v in community c,
-    // which is then provided by constrained_membership[v].
-    #ifdef DEBUG
-      cerr << "SLM\tOrig" << endl;
-    #endif // DEBUG
-    for (size_t v = 0; v < graph->vcount(); v++)
+    // Then check for each community
+    for (set<size_t>::iterator c_it = comms->begin();
+        c_it != comms->end();
+        c_it++)
     {
-      collapsed_constrained_membership[partition->membership(v)] = constrained_membership[v];
-      #ifdef DEBUG
-        cerr << partition->membership(v) << "\t" << constrained_membership[v] << endl;
-      #endif // DEBUG
+      // Whether we recursively find even more refined subsets.
+      size_t comm = *c_it;
+      set<size_t> node_subset = partition->get_community(comm);
+      this->move_nodes_subset_recursive(partition, node_subset);
     }
-
-    #ifdef DEBUG
-      cerr <<   "Calculate partition quality." << endl;
-      double q = partition->quality();
-      cerr <<   "Calculate collapsed partition quality." << endl;
-      double q_collapsed = collapsed_partition->quality();
-      if (fabs(q - q_collapsed) > 1e-6)
-      {
-        cerr << "ERROR: Quality of original partition and collapsed partition are not equal." << endl;
-      }
-      cerr <<   "partition->quality()=" << q
-           << ", collapsed_partition->quality()=" << q_collapsed << endl;
-      cerr <<   "graph->total_weight()=" << graph->total_weight()
-           << ", collapsed_graph->total_weight()=" << collapsed_graph->total_weight() << endl;
-      cerr <<   "graph->ecount()=" << graph->ecount()
-           << ", collapsed_graph->ecount()="  << collapsed_graph->ecount() << endl;
-      cerr <<   "graph->is_directed()=" << graph->is_directed()
-           << ", collapsed_graph->is_directed()="  << collapsed_graph->is_directed() << endl;
-      cerr <<   "graph->correct_self_loops()=" << graph->correct_self_loops()
-           << ", collapsed_graph->correct_self_loops()="  << collapsed_graph->correct_self_loops() << endl;
-    #endif // DEBUG
-
-    // Optimise partition for collapsed graph
-    #ifdef DEBUG
-      cerr << "Quality before moving " << collapsed_partition->quality() << endl;
-    #endif
-    improv += this->move_nodes_constrained(collapsed_partition, collapsed_constrained_membership);
-    #ifdef DEBUG
-      cerr << "Found " << partition->nb_communities() << " communities, improved " << improv << endl;
-      cerr << "Quality after moving " << collapsed_partition->quality() << endl << endl;
-    #endif // DEBUG
-
-    // Make sure improvement on coarser scale is reflected on the
-    // scale of the graph as a whole.
-    partition->from_coarser_partition(collapsed_partition);
-
-    #ifdef DEBUG
-      cerr << "Quality on finer partition " << partition->quality() << endl << endl;
-    #endif // DEBUG
-
-    // Clean up memory after use.
-    delete collapsed_partition;
-    delete collapsed_graph;
   }
-  // We renumber the communities to make sure we stick in the range
-  // 0,1,...,r - 1 for r communities.
-  // By default, we number the communities in decreasing order of size,
-  // so that 0 is the largest community, 1 the second largest, etc...
-  partition->renumber_communities();
-  // Return the quality of the current partition.
-  return partition->quality();
+  delete comm;
 }
 
-double Optimiser::move_nodes_constrained(MutableVertexPartition* partition, vector<size_t> const& constrained_membership)
+double Optimiser::move_nodes_subset(MutableVertexPartition* partition, set<size_t> const& node_subset)
 {
   #ifdef DEBUG
-    cerr << "double Optimiser::move_nodes(MutableVertexPartition* partition)" << endl;
+    cerr << "double Optimiser::move_nodes_subset(MutableVertexPartition* partition, set<size_t> const& node_subset)" << endl;
   #endif
   // get graph
   Graph* graph = partition->get_graph();
@@ -760,7 +653,7 @@ double Optimiser::move_nodes_constrained(MutableVertexPartition* partition, vect
   // Number of nodes in the graph
   size_t n = graph->vcount();
   // Number of moved nodes during one loop
-  size_t nb_moves = 2*n;
+  size_t nb_moves = 2*node_subset.size();
   // Initialize the degree vector
   // If we want to debug the function, we will calculate some additional values.
   // In particular, the following consistencies could be checked:
@@ -787,9 +680,8 @@ double Optimiser::move_nodes_constrained(MutableVertexPartition* partition, vect
     int fast_n_dirty_constrained = false;
 
     // Establish vertex order
-    // We normally initialize the normal vertex order
-    // of considering node 0,1,...
-    vector<size_t> vertex_order = range(n);
+    // We normally initialize the normal vertex order as given in de node_subset
+    vector<size_t> vertex_order = vector<size_t>(node_subset.begin(), node_subset.end());
     // But if we use a random order, we shuffle this order.
     if (this->random_order)
       random_shuffle( vertex_order.begin(), vertex_order.end() );
@@ -814,7 +706,7 @@ double Optimiser::move_nodes_constrained(MutableVertexPartition* partition, vect
         // Keep track of the possible improvements and (neighbouring) communities.
         size_t neigh_comm;
         double possible_improv;
-        set<size_t>* neigh_comms = partition->get_neigh_comms(v, IGRAPH_ALL, constrained_membership);
+        set<size_t>* neigh_comms = partition->get_neigh_comm(v, IGRAPH_ALL, node_subset);
         // Loop through the communities of the neighbours
         for(set<size_t>::iterator it_neigh_comm = neigh_comms->begin();
             it_neigh_comm != neigh_comms->end(); ++it_neigh_comm)
@@ -865,8 +757,6 @@ double Optimiser::move_nodes_constrained(MutableVertexPartition* partition, vect
     // Keep track of total improvement over multiple loops
     total_improv += improv;
   }
-  partition->renumber_communities();
-
   return total_improv;
 }
 

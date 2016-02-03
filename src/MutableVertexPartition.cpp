@@ -224,6 +224,33 @@ void MutableVertexPartition::renumber_communities()
   this->init_admin();
 }
 
+/******************************************************************
+ This function breaks apart a node set in its individual nodes.
+*******************************************************************/
+void MutableVertexPartition::break_node_set(set<size_t> const& node_set)
+{
+  for (set<size_t>::iterator v_it = node_set.begin();
+      v_it != node_set.end();
+      v_it++)
+  {
+    size_t v = *v_it;
+    this->move_node(v, this->add_empty_community());
+  }
+}
+
+set<size_t>* MutableVertexPartition::get_communities_node_set(set<size_t> const& node_set)
+{
+  set<size_t>* communities = new set<size_t>();
+  for (set<size_t>::iterator v_it = node_set.begin();
+      v_it != node_set.end();
+      v_it++)
+  {
+    size_t v = *v_it;
+    communities->insert(this->membership(v));
+  }
+  return communities;
+}
+
 /****************************************************************************
  Renumber the communities using the provided membership vector. Notice that this
  doesn't ensure any property of the community numbers.
@@ -492,14 +519,14 @@ set<size_t>* MutableVertexPartition::get_neigh_comms(size_t v, igraph_neimode_t 
   return neigh_comms;
 }
 
-set<size_t>* MutableVertexPartition::get_neigh_comms(size_t v, igraph_neimode_t mode, vector<size_t> const& constrained_membership)
+set<size_t>* MutableVertexPartition::get_neigh_comms(size_t v, igraph_neimode_t mode, set<size_t> const& node_set)
 {
   vector<size_t>* neigh = this->graph->get_neighbours(v, mode);
   set<size_t>* neigh_comms = new set<size_t>();
   for (size_t i=0; i < this->graph->degree(v, mode); i++)
   {
     size_t u = (*neigh)[i];
-    if (constrained_membership[v] == constrained_membership[u])
+    if (node_set.find(u) != node_set.end())
       neigh_comms->insert( this->membership(u) );
   }
   delete neigh;
